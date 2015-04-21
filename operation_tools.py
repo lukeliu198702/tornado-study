@@ -10,6 +10,12 @@ import tornado.options
 import tornado.web
 from tornado.options import define, options
 
+from tornado.options import parse_command_line
+from tornado.web import *
+
+import psycopg2
+import momoko
+
 define("port", default=8888, help="run on the given port", type=int)
 
 
@@ -30,13 +36,35 @@ class DomainPageHandler(tornado.web.RequestHandler):
         self.render('ApplyDomainResult.html', RootDomain=RootDomain, HostRecord=HostRecord, RecordType=RecordType,
                     IP=IP)
 
+class BaseHandler(RequestHandler):
+    @property
+    def db(self):
+        return self.application.db
+
+
+class TutorialHandler(BaseHandler):
+    @asynchronous
+    def get(self):
+        query_string='SELECT "LookUp"."Description","LookUp"."Id" FROM public."LookUp";'
+        self.db.execute(query_string,callback=self._done)
+        #self.write('Some text here!')
+        #self.finish()
+    def _done(self,cursor,error):
+        self.write('Results: %r'%(cursor.fetchall(),))
+        self.finish()
 
 if __name__ == '__main__':
     tornado.options.parse_command_line()
     app = tornado.web.Application(
-        handlers=[(r'/', IndexHandler), (r'/domain', ApplyDomainPageHandler),(r'/ApplyDomainResult',DomainPageHandler)],
+        handlers=[(r'/', IndexHandler), (r'/domain', ApplyDomainPageHandler),(r'/ApplyDomainResult',DomainPageHandler),(r'/db', TutorialHandler)],
         template_path=os.path.join(os.path.dirname(__file__), "pages")
     )
+    app.db= momoko.Pool(
+        dsn='dbname=cmdbuild user=postgres password=000000 '
+            'host=10.200.200.233 port=5432',
+        size=1
+    )
+
     http_server = tornado.httpserver.HTTPServer(app)
     http_server.listen(options.port)
     tornado.ioloop.IOLoop.instance().start()
