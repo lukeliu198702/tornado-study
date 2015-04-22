@@ -41,6 +41,35 @@ class BaseHandler(RequestHandler):
     def db(self):
         return self.application.db
 
+class IPHandler(BaseHandler):
+    @asynchronous
+    def get(self):
+        query_string='SELECT "LookUp"."Description","LookUp"."Id" FROM public."LookUp";'
+        self.db.execute(query_string,callback=self._done)
+        #self.write('Some text here!')
+        #self.finish()
+    def _done(self,cursor,error):
+        self.write('Results: %r'%(cursor.fetchall(),))
+        self.finish()
+class PhysicalServerHandler(BaseHandler):
+    @asynchronous
+    def get(self, *args, **kwargs):
+        query_string='''
+        select distinct "PhysicalServeer"."Code" as "计算机名","PhysicalServeer"."Description" as "其他ip","PhysicalServeer"."IntranetIP" as "内网ip","PhysicalServeer"."ExtranetIP" as "公网ip",
+"PhysicalServeer"."Hdinfo" as "硬盘总大小","Map_Server_ProductUse"."IdClass2" as "所属产品","ServerUse"."Description" as "服务器描述","ServerUse"."Owner" as "负责人"
+from "PhysicalServeer"
+inner join "Map_Server_ProductUse"
+on "PhysicalServeer"."Id"="Map_Server_ProductUse"."IdObj1" and "PhysicalServeer"."Status"='A' and "Map_Server_ProductUse"."Status"='A'
+inner join "ServerUse"
+on "ServerUse"."Id"="Map_Server_ProductUse"."IdObj2"
+order by "Map_Server_ProductUse"."IdClass2"
+'''
+        self.db.execute(query_string,callback=self._done)
+
+    def _done(self,cursor,error):
+        self.write('Results: %r'%(cursor.fetchall(),))
+
+        self.finish()
 
 class TutorialHandler(BaseHandler):
     @asynchronous
@@ -56,12 +85,16 @@ class TutorialHandler(BaseHandler):
 if __name__ == '__main__':
     tornado.options.parse_command_line()
     app = tornado.web.Application(
-        handlers=[(r'/', IndexHandler), (r'/domain', ApplyDomainPageHandler),(r'/ApplyDomainResult',DomainPageHandler),(r'/db', TutorialHandler)],
+        handlers=[(r'/', IndexHandler),
+                  (r'/domain', ApplyDomainPageHandler),
+                  (r'/applydomainresult',DomainPageHandler),
+                  (r'/ip',IPHandler),
+                  (r'/pys',PhysicalServerHandler)],
         template_path=os.path.join(os.path.dirname(__file__), "pages")
     )
     app.db= momoko.Pool(
-        dsn='dbname=cmdbuild user=postgres password=000000 '
-            'host=10.200.200.233 port=5432',
+        dsn='dbname=cmdbuild user=postgres password=abcd123! '
+            'host=10.200.200.201 port=5432',
         size=1
     )
 
